@@ -11,7 +11,7 @@ spec:
     # 改成你自己的仓库地址，例如 https://github.com/joufenn/argocd-demo.git
     repoURL: https://github.com/joufenn/argoCd
     targetRevision: HEAD
-    path: manifests
+    path: demo/manifests
   destination:
     server: https://kubernetes.default.svc
     namespace: demo

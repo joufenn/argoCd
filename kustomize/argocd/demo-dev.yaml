@@ -11,7 +11,7 @@ spec:
     repoURL: https://github.com/joufenn/argoCd
     targetRevision: HEAD
     # 只改 path，指向 dev overlay；渲染交给 kustomize
-    path: overlays/dev
+    path: kustomize/overlays/dev
   destination:
     server: https://kubernetes.default.svc
     namespace: demo-dev
