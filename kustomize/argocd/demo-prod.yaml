@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-nginx-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/joufenn/argoCd
+    targetRevision: HEAD
+    path: overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-prod
+  syncPolicy:
+    automated:
+      # 生产保留 prune，但不开 selfHeal：
+      # 有人手动改集群不会被立刻改回去，方便排查；差异会一直显示 OutOfSync
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

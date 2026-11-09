@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 把 base 里所有资源的 namespace 统一改写为 demo-dev
+namespace: demo-dev
+
+resources:
+  - ../../base
+
+# 开发环境：1 个副本
+replicas:
+  - name: demo-nginx
+    count: 1
+
+# 开发环境跟 alpine 最新版，方便快速验证
+images:
+  - name: nginx
+    newTag: 1.27-alpine

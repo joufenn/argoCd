@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-nginx
+  labels:
+    app: demo-nginx
+spec:
+  selector:
+    app: demo-nginx
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

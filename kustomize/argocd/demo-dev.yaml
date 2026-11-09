@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-nginx-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/joufenn/argoCd
+    targetRevision: HEAD
+    # 只改 path，指向 dev overlay；渲染交给 kustomize
+    path: overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
