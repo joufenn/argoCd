@@ -6,8 +6,11 @@
 .
 ├── base/                        # 所有环境共有的原始清单，不含任何环境差异
 │   ├── kustomization.yaml
-│   ├── deployment.yaml          # nginx Deployment
-│   └── service.yaml             # nginx Service
+│   ├── deployment.yaml          # nginx Deployment（sync-wave 1）
+│   ├── service.yaml             # nginx Service（sync-wave 0）
+│   └── hooks/
+│       ├── migrate-job.yaml     # PreSync Hook：模拟数据库迁移
+│       └── smoke-test-job.yaml  # PostSync Hook：同步后冒烟测试
 ├── overlays/
 │   ├── dev/kustomization.yaml   # demo-dev 命名空间 · 1 副本 · 1.27-alpine
 │   └── prod/kustomization.yaml  # demo-prod 命名空间 · 3 副本 · 1.27.1-alpine · 内存上限 256Mi
@@ -82,6 +85,35 @@ kubectl -n demo-dev get pods -w
 # prod 没开 selfHeal：手动改不会被改回去，但 UI 会一直显示 OutOfSync
 kubectl -n demo-prod scale deploy demo-nginx --replicas=1
 ```
+
+## 6. Sync Waves + Hooks
+
+同步顺序 = **phase 优先，wave 次之**：
+
+```
+PreSync (wave -1)  →  Sync: Service (wave 0) → Deployment (wave 1)  →  PostSync (wave 5)
+```
+
+- wave 数字小的先应用；一波内所有资源健康后，才进入下一波
+- Hook 不属于应用资源，不会出现在资源树里，只在同步过程中执行
+
+验证：
+
+```bash
+kubectl -n demo-dev get jobs
+kubectl -n demo-dev logs job/demo-nginx-migrate
+kubectl -n demo-dev logs job/demo-nginx-smoke-test
+```
+
+UI 里进 `demo-nginx-dev` → `Sync`，能看到 PreSync / Sync / PostSync 三个阶段依次变绿。
+
+重跑一次：点 `Refresh` → `Sync`，或随便改点东西 push。`BeforeHookCreation` 会在每次同步前删掉旧 Job 再重建（Job 的 spec 不可变，不删会报 `field is immutable`）。
+
+几个要注意的点：
+
+- PostSync 失败会让这次 sync 失败，Application 变成 `Degraded`，这正是「发布后验证」的价值
+- 想让 Hook 只在一个环境跑，把它从 `base/kustomization.yaml` 移到对应 overlay 的 `resources` 里
+- `kubectl kustomize overlays/dev` 能直接在本地看到渲染出来的 hook 注解，不用等集群
 
 ## 清理
 

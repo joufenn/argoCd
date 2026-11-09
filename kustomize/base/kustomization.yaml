@@ -5,3 +5,5 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
+  - hooks/migrate-job.yaml
+  - hooks/smoke-test-job.yaml

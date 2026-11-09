@@ -4,6 +4,9 @@ metadata:
   name: demo-nginx
   labels:
     app: demo-nginx
+  annotations:
+    # sync-wave 0：最先应用的一波
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   selector:
     app: demo-nginx
@@ -11,3 +14,4 @@ spec:
     - name: http
       port: 80
       targetPort: 80
+  type: NodePort

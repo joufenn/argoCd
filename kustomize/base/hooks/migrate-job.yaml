@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: demo-nginx-migrate
+  annotations:
+    # PreSync：在应用任何普通资源之前执行
+    argocd.argoproj.io/hook: PreSync
+    # 每次同步前先删掉旧的同名 Hook，否则 Job 不可变、第二次同步会失败
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "[PreSync] 模拟数据库迁移开始"
+              sleep 5
+              echo "[PreSync] 迁移完成，继续后面的 wave"
