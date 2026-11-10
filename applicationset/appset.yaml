@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: demo-apps
+  namespace: argocd
+spec:
+  # 打开 Go template，模板里才能用 {{.path.basename}} / {{.path.path}}
+  goTemplate: true
+  generators:
+    - git:
+        repoURL: https://github.com/joufenn/argoCd
+        revision: HEAD
+        directories:
+          - path: applicationset/apps/*
+        # 默认 180 秒才轮询一次仓库，学习时调小，新增目录能很快看到效果
+        requeueAfterSeconds: 30
+  template:
+    metadata:
+      name: '{{.path.basename}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/joufenn/argoCd
+        targetRevision: HEAD
+        path: '{{.path.path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: 'demo-{{.path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
