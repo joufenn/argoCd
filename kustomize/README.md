@@ -16,7 +16,7 @@
 │   └── prod/kustomization.yaml  # demo-prod 命名空间 · 3 副本 · 1.27.1-alpine · 内存上限 256Mi
 └── argocd/
     ├── demo-dev.yaml            # Application → overlays/dev（自动同步 + selfHeal）
-    └── demo-prod.yaml           # Application → overlays/prod（自动同步，不开 selfHeal）
+    └── demo-prod.yaml           # Application → overlays/prod（自动同步、selfHeal 关闭、忽略 replicas）
 ```
 
 Argo CD 对 kustomize 是一等公民支持：Application 里 `path` 指向 overlay 目录即可，
@@ -114,6 +114,68 @@ UI 里进 `demo-nginx-dev` → `Sync`，能看到 PreSync / Sync / PostSync 三�
 - PostSync 失败会让这次 sync 失败，Application 变成 `Degraded`，这正是「发布后验证」的价值
 - 想让 Hook 只在一个环境跑，把它从 `base/kustomization.yaml` 移到对应 overlay 的 `resources` 里
 - `kubectl kustomize overlays/dev` 能直接在本地看到渲染出来的 hook 注解，不用等集群
+
+## 7. ignoreDifferences：让「外来字段」不再制造假 OutOfSync
+
+prod 的 Deployment 里 `replicas` 真实归 HPA 管，Git 里的 3 只是初始值。不忽略的话，
+Argo CD 会一直显示 OutOfSync，而且每次 sync 都把 HPA 扩出来的副本打回 3。
+
+`demo-prod.yaml` 现在加了：
+
+```yaml
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+```
+
+验证（先制造差异，再看忽略后的状态）：
+
+```bash
+# 1. 扮演 HPA：把副本扩到 5（HPA 扩容时做的就是这个动作）
+kubectl -n demo-prod scale deploy demo-nginx --replicas=5
+
+# 2. 应该是 OutOfSync（prod 没开 selfHeal，集群不会被立刻改回去）
+kubectl -n argocd get app demo-nginx-prod
+```
+
+push 本仓库，然后重新 apply 一次 Application（Application 对象本身不受 Argo CD 管理，必须手动更新）：
+
+```bash
+kubectl apply -f kustomize/argocd/demo-prod.yaml
+```
+
+再看：
+
+```bash
+kubectl -n argocd get app demo-nginx-prod                                  # 变成 Synced
+kubectl -n demo-prod get deploy demo-nginx -o jsonpath='{.spec.replicas}{"\n"}'   # 仍然是 5
+```
+
+两个配置缺一不可：
+
+| 配置 | 作用 |
+|---|---|
+| `ignoreDifferences` | 只影响「比较」：UI 不再报 OutOfSync |
+| `RespectIgnoreDifferences=true` | 影响「同步」：sync 时保留集群里的 5，不写回 3 |
+
+只加前者会出现「显示 Synced，但一点 Sync 又变回 3」，然后再次 OutOfSync，来回打架。
+
+反向验证：把 `ignoreDifferences` 删掉 push，sync 一次，replicas 会被改回 3。
+
+真实世界对应关系：`/spec/replicas` ← HPA；`/metadata/annotations/*` ← webhook / operator；
+被其他控制器持续写回的字段都可以这样处理。路径里有数组或特殊字符时用 `jqPathExpressions`：
+
+```yaml
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - '.metadata.annotations["example.com/managed-by"]'
+```
+
+注意别把真正该由 Git 管的字段也忽略了，那等于放弃 GitOps。
 
 ## 清理
 

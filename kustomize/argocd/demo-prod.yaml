@@ -7,6 +7,13 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
+  # 真实环境里 Deployment 的 replicas 归 HPA 管，Git 里的 3 只是初始值。
+  # 不忽略的话 App 会永远 OutOfSync，一 sync 还会把 HPA 扩出来的副本数打回 3。
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
   source:
     repoURL: https://github.com/joufenn/argoCd
     targetRevision: HEAD
@@ -21,3 +28,5 @@ spec:
       prune: true
     syncOptions:
       - CreateNamespace=true
+      # 让 sync 也尊重上面的忽略：保留集群里被控制器改过的值，不写回 Git 的值
+      - RespectIgnoreDifferences=true
