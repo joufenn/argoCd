@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-nginx-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # 真实环境里 Deployment 的 replicas 归 HPA 管，Git 里的 3 只是初始值。
+  # 不忽略的话 App 会永远 OutOfSync，一 sync 还会把 HPA 扩出来的副本数打回 3。
+  source:
+    repoURL: https://github.com/joufenn/argoCd
+    targetRevision: HEAD
+    path: kustomize/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-prod
+  syncPolicy:
+    automated:
+      # 生产保留 prune，但不开 selfHeal：
+      # 有人手动改集群不会被立刻改回去，方便排查；差异会一直显示 OutOfSync
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+      # 让 sync 也尊重上面的忽略：保留集群里被控制器改过的值，不写回 Git 的值
